@@ -68,18 +68,18 @@ final class CronMonitorTest extends TestCase {
 		$this->assertCount( 2, $this->requestHistory );
 	}
 
-	public function testStartPromiseExceptionEscapesEnd(): void {
-		// Documents current behaviour: the start-promise wait() call is outside
-		// the try/catch in cronMonitor::end(), so exceptions from the start
-		// request escape. Follow-up: wrap wait() in try/catch.
+	public function testEndSwallowsStartPromiseExceptionAndStillFiresEndRequest(): void {
+		// The start-promise wait() is now wrapped in the same try/catch as
+		// the JSON-decoding step, so an exception from the start request
+		// is swallowed and the end request still fires with an empty runId.
 		$monitor = $this->buildMonitorWithMockedTransport( 'job-005', [
 			new \RuntimeException( 'start failed' ),
 			new Response( 200, [], '' ),
 		] );
 
-		$this->expectException( \RuntimeException::class );
-		$this->expectExceptionMessage( 'start failed' );
 		$monitor->end();
+		$this->assertCount( 2, $this->requestHistory );
+		$this->assertSame( 'http://monitor.test/jobHistory/end/job-005/', (string) $this->requestHistory[1][ 'request' ]->getUri() );
 	}
 
 	/**

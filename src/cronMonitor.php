@@ -7,26 +7,27 @@ use GuzzleHttp\Exception\GuzzleException;
 
 class cronMonitor {
 
-	private string                      $jobId;
-	private string                      $runId;
-	private \GuzzleHttp\Client          $client;
-	private \GuzzleHttp\Promise\Promise $jobPromise;
+	private string                               $jobId;
+	private \GuzzleHttp\Client                   $client;
+	private \GuzzleHttp\Promise\PromiseInterface $jobPromise;
 
 	public function __construct( string $jobId ) {
 		$this->jobId      = $jobId;
 		$config           = config::getEnvironmentConfig();
-		$this->client     = new \GuzzleHttp\Client( [ 'base_uri' => $config->appDictionary[ 'cronMonitorUrl' ] ] );
+		$this->client     = new \GuzzleHttp\Client( [ 'base_uri' => (string) ( $config->appDictionary[ 'cronMonitorUrl' ] ?? '' ) ] );
 		$this->jobPromise = $this->client->requestAsync( 'GET', 'jobHistory/start/' . $this->jobId );
 	}
 
 	public function end(): void {
 
+		$runId = '';
 		//make sure the job started and get the run id from it's response
-		$response = $this->jobPromise->wait();
-		$runId    = '';
 		try {
-			$parsedResponse = json_decode( $response->getBody(), false, 512, JSON_THROW_ON_ERROR );
-			$runId          = $parsedResponse->data;
+			$response       = $this->jobPromise->wait();
+			$parsedResponse = json_decode( (string) $response->getBody(), false, 512, JSON_THROW_ON_ERROR );
+			if( is_object( $parsedResponse ) && isset( $parsedResponse->data ) ) {
+				$runId = (string) $parsedResponse->data;
+			}
 		}
 		catch( \JsonException|\Exception $e ) {
 		}
